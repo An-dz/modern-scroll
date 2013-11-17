@@ -111,6 +111,8 @@ function inject_css()
 		/* set back standard values (CSS values not necessarily used by modern scroll, but maybe altered by the website): */
 		"#modern_scroll, #ms_v_container, #ms_h_container, #ms_vbar_bg, #ms_hbar_bg, #ms_vbar, #ms_hbar, #ms_superbar, #ms_page_cover, #ms_upbutton, #ms_downbutton{ position:fixed; z-index:2147483647; border:none; padding:0; margin:0; display:none; background:none; }\n"+
 		"#ms_vbar_ui, #ms_hbar_ui, #ms_vbar_bg_ui, #ms_hbar_bg_ui{ border:none; padding:0; margin:0; }\n\n"+
+		/* take vertical bar away from chat bar on facebook */
+		"#facebook.sidebarCapable.sidebarMode #ms_vbar, #facebook.sidebarCapable.sidebarMode #ms_vbar_bg { right: 205px }\n"+
 		
 		/* set values (most general first - can be overwritten by following rules): */
 		"#modern_scroll, #modern_scroll_bars, #modern_scroll_buttons{ display:inline; }\n"+
