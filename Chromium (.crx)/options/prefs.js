@@ -1,18 +1,19 @@
-window.addEventListener("DOMContentLoaded", restoreprefs, false);
-window.addEventListener("DOMContentLoaded", localize, false);
-window.addEventListener("mouseup", save_buttonposition, false);
+window.addEventListener("DOMContentLoaded", populateOptions, false);
+window.addEventListener("msButtonPositionChange", saveButtonPosition, true);
+window.addEventListener("change", savePrefs, false);
 
-window.addEventListener("change", function(e) // save preferences:
+function populateOptions(){
+	localize();
+	checkLicensing();
+	restorePrefs();
+}
+
+function savePrefs(e) // save preferences:
 {
 	if(e.target.id === "save_set" || e.target.id === "saved_sets") return; // handled via onclick funtions
 	if(!e.target.validity.valid) // correct out-of-range inputs
 	{
-		e.target.style.transition = "box-shadow 500ms";
-		e.target.style.boxShadow = "#F00 0 0 10px 0";
-		window.setTimeout(function(){
-			e.target.value = chrome.extension.getBackgroundPage().w[e.target.id];
-			e.target.style.boxShadow = null;
-		}, 500);
+		e.target.value = chrome.extension.getBackgroundPage().w[e.target.id];
 		return;
 	}
 	
@@ -33,10 +34,10 @@ window.addEventListener("change", function(e) // save preferences:
 	else										chrome.extension.sendMessage({data:"update_optionspage"});
 	
 	// show/hide containers:
-	if(e.target.id === "show_superbar")					 document.getElementById("superbar_container").style.height=(e.target.checked?"auto":"0");
 	if(e.target.id === "show_buttons")					 document.getElementById("button_container").style.height=(e.target.value==="1"?"0":"auto");
 	if(e.target.id === "use_own_scroll_functions")		 document.getElementById("keyscroll_velocity_container").style.display=(e.target.checked?null:"none");
-	if(e.target.id === "use_own_scroll_functions_mouse") document.getElementById("mousescroll_container").style.display=(e.target.checked?null:"none");
+	if(e.target.id === "use_own_scroll_functions_mouse") document.getElementById("mousescroll_container").style.display=(e.target.checked?"inline":"none");
+	if(e.target.id === "own_scroll_functions_middle")	 document.getElementById("middlescroll_container").style.display=(e.target.checked?"inline":"none");
 	if(e.target.id === "animate_scroll")				 document.getElementById("scroll_container").style.display=(e.target.checked?null:"none");
 	
 	// update slider values:
@@ -46,32 +47,21 @@ window.addEventListener("change", function(e) // save preferences:
 	if(e.target.id === "keyscroll_velocity")	document.getElementById("storage.keyscroll_velocity").innerHTML		= Math.round(100*e.target.value/2);
 	if(e.target.id === "mousescroll_velocity")	document.getElementById("storage.mousescroll_velocity").innerHTML	= Math.round(100*e.target.value/3);
 	if(e.target.id === "mousescroll_distance")	document.getElementById("storage.mousescroll_distance").innerHTML	= Math.round(100*e.target.value);
+	if(e.target.id === "middlescroll_velocity")	document.getElementById("storage.middlescroll_velocity").innerHTML	= Math.round(100*e.target.value);
 	if(e.target.id === "scroll_velocity")		document.getElementById("storage.scroll_velocity").innerHTML		= Math.round(100*e.target.value/5);
-	
-},false);
-
-function save_new_value(key, value)
-{
-	var saveobject = {};
-	saveobject[key] = value;
-	chrome.storage.sync.set(saveobject);					// save it in Chrome's synced storage
-	chrome.extension.getBackgroundPage().w[key] = value;	// update settings in background.js
-	
-	chrome.extension.sendMessage({data:"update_optionspage"});
 }
 
-function save_buttonposition(){
-	if(document.getElementsByClassName("dragged_button")[0])
-		save_new_value("buttonposition", (100 * document.getElementsByClassName("dragged_button")[0].offsetLeft / window.innerWidth));
-}
+function save_new_value(key, value){ chrome.extension.getBackgroundPage().save_new_value(key, value); }
 
-function restoreprefs()
+function saveButtonPosition(e){ save_new_value("buttonposition", e.detail); }
+
+function restorePrefs()
 {
 	var storage = chrome.extension.getBackgroundPage().w;
 	chrome.storage.sync.get("saved_sets", function(s){
 		storage.saved_sets = s.saved_sets;
 		
-		var selects = document.getElementsByTagName("select");
+		var selects = document.querySelectorAll("select");
 		for(var i=0; i<selects.length; i++){
 			if(!storage[selects[i].id]) continue;
 			if(selects[i].id === "saved_sets")
@@ -84,80 +74,144 @@ function restoreprefs()
 				}
 				else continue;
 			}
-			else document.getElementsByTagName("select")[i].value = storage[selects[i].id];
+			else selects[i].value = storage[selects[i].id];
 		}
 	});
 	
-	var inputs = document.getElementsByTagName("input");	
+	var inputs = document.querySelectorAll("input");	
 	for(var i=0; i<inputs.length; i++){
 		if(!storage[inputs[i].id]) continue;
-		if(inputs[i].type==="checkbox")	document.getElementsByTagName("input")[i].checked = (storage[inputs[i].id] === "0" ? false : true);
-		else							document.getElementsByTagName("input")[i].value = storage[inputs[i].id];
+		if(inputs[i].type==="checkbox")	inputs[i].checked = (storage[inputs[i].id] === "0" ? false : true);
+		else							inputs[i].value = storage[inputs[i].id];
 	}
 	
 	if(document.getElementById("show_buttons").value !== "1")				document.getElementById("button_container").style.height				= "auto";
-	if(document.getElementById("show_superbar").checked)					document.getElementById("superbar_container").style.height				= "auto";
 	if(!document.getElementById("use_own_scroll_functions").checked)		document.getElementById("keyscroll_velocity_container").style.display	= "none";
-	if(!document.getElementById("use_own_scroll_functions_mouse").checked)	document.getElementById("mousescroll_container").style.display			= "none";
+	if(document.getElementById("use_own_scroll_functions_mouse").checked)	document.getElementById("mousescroll_container").style.display			= "inline";
+	if(document.getElementById("own_scroll_functions_middle").checked)		document.getElementById("middlescroll_container").style.display			= "inline";
 	if(!document.getElementById("animate_scroll").checked)					document.getElementById("scroll_container").style.display				= "none";
 	
 	document.getElementById("border_radius").max = Math.round(Math.max(document.getElementById("size").value, document.getElementById("hover_size").value)/2);
 	
-	for(var i = 0; i < document.getElementsByClassName("slider_values").length; i++) // display slider values:
+	var sliders = document.querySelectorAll(".slider_values");
+	for(var i = 0; i < sliders.length; i++) // display slider values:
 	{
-		var which_value = document.getElementsByClassName("slider_values")[i].id.split(".")[1];
+		var which_value = sliders[i].id.split(".")[1];
 		var raw_value = (storage[which_value] ? storage[which_value] : document.getElementById(which_value).value);
-		document.getElementsByClassName("slider_values")[i].innerHTML = (document.getElementById(which_value).dataset.defaultvalue ? Math.round(100*raw_value/document.getElementById(which_value).dataset.defaultvalue) : raw_value);
+		sliders[i].innerHTML = (document.getElementById(which_value).dataset.defaultvalue ? Math.round(100*raw_value/document.getElementById(which_value).dataset.defaultvalue) : raw_value);
 	}	
 	
-	add_page_handling(storage);
+	add_page_handling();
 }
 
-function add_page_handling(storage)
+function add_page_handling()
 {
 	/*################### use when Issue 247969 is fixed: ######################
 	document.getElementById("save_set").addEventListener("focus",function(){
-		if(this.innerHTML === chrome.i18n.getMessage("new_set_name")) this.innerHTML = "";
+		if(this.innerHTML === getString("new_set_name")) this.innerHTML = "";
 	},false);
 	document.getElementById("save_set").addEventListener("blur",function(){
-		if(this.innerHTML === "") this.innerHTML = chrome.i18n.getMessage("new_set_name");
+		if(this.innerHTML === "") this.innerHTML = getString("new_set_name");
 	},false);*/
+
+	// ##############################
+	// ##### settings profiles: #####
+	// ##############################
+
+	document.getElementById("save_set_img").addEventListener("click", confirm_save_set, false);
+	document.getElementById("delete_set_img").addEventListener("click", confirm_delete_set, false);
+	document.getElementById("load_set_img").addEventListener("click", confirm_load_set, false);
 	
-	document.getElementById("save_set_img").addEventListener("click", function(){ // save set:
-		if(document.getElementById("save_set").innerHTML === "Default"){ alert(chrome.i18n.getMessage("default_change_impossible")); return; }
-		
-		for(var option = 0; option < document.getElementById("saved_sets").options.length; option++){
-			if(document.getElementById("saved_sets").options[option].value === document.getElementById("save_set").innerHTML){
-				var overwrite_confirmed = window.confirm(chrome.i18n.getMessage("confirm_overwrite"));
-				if(!overwrite_confirmed) return;
-				break;
-			}
-		}
-		
-		if(!storage.saved_sets) storage.saved_sets = {};
-		storage.saved_sets[document.getElementById("save_set").innerHTML] = {};
-		for(var setting in storage){
-			if(setting === "saved_sets") continue;
-			storage.saved_sets[document.getElementById("save_set").innerHTML][setting] = storage[setting];
-		}
-		
-		chrome.storage.sync.set(storage);
-		
-		if(overwrite_confirmed) return; // don't add a new option if one gets overwritten
-		document.getElementById("saved_sets").options[document.getElementById("saved_sets").options.length] =
-			new Option(document.getElementById("save_set").innerHTML, document.getElementById("save_set").innerHTML);
+	document.getElementById("save_set").addEventListener("keydown", function(){ // Enter -> save configuration
+		if(window.event.which !== 13) return;
+
+		window.event.preventDefault();
+		window.event.target.blur();
+		document.getElementById("save_set_img").click();
 	}, false);
 	
-	document.getElementById("delete_set_img").addEventListener("click", function(){ // delete set:
-		if(document.getElementById("saved_sets").value === "Default"){
-			alert(chrome.i18n.getMessage("default_delete_impossible"));
+	// #########################
+	// ##### info bubbles: #####
+	// #########################
+
+	var info_bubbles = document.querySelectorAll(".i");
+	
+	for(var i=0; i<info_bubbles.length; i++) // position top/bottom:
+	{
+		info_bubbles[i].addEventListener("mouseover", function(){
+			window.clearTimeout(bubble_setback);
+			if(this.offsetTop>window.scrollY+window.innerHeight/2) this.lastChild.style.marginTop = (-this.lastChild.offsetHeight+8)+"px";
+		}, false);
+		info_bubbles[i].addEventListener("mouseout", function(){
+			bubble_setback = window.setTimeout(function(){this.lastChild.style.marginTop= null;}.bind(this),500);
+		}, false);
+	}
+
+	// ################
+	// ### dialogs: ###
+	// ################
+
+	var dialog_close_buttons = document.querySelectorAll("dialog .close, dialog .hide_dialog");
+	for(var i = 0; i < dialog_close_buttons.length; i++) dialog_close_buttons[i].addEventListener("click", hideDialog, false);
+
+	document.querySelector("#confirm_overwrite_button").addEventListener("click", function(){ save_set(true); }, false);
+	document.querySelector("#confirm_delete_button").addEventListener("click", delete_set, false);
+	document.querySelector("#confirm_load_button").addEventListener("click", load_set, false);
+
+	document.querySelector("#authorize").addEventListener("click", function(){
+		chrome.runtime.getBackgroundPage( function(bg){ bg.getLicense(true); } );
+	}, false);
+	document.querySelector("#get_more").addEventListener("click", function(){ showDialog("iaps"); }, false);
+}
+var bubble_setback; // timeout for info bubbles
+
+function confirm_save_set(){
+	if(document.getElementById("save_set").innerHTML === "Default"){
+		showDialog("default_change_impossible");
+		return;
+	}
+	
+	for(var option = 0; option < document.getElementById("saved_sets").options.length; option++){
+		if(document.getElementById("saved_sets").options[option].value === document.getElementById("save_set").innerHTML){
+			showDialog("confirm_overwrite");
 			return;
 		}
-		var delete_confirmed = window.confirm(chrome.i18n.getMessage("confirm_delete"));
-		if (!delete_confirmed) return;
+	}
+
+	save_set(false);
+}
+function save_set(overwrite){
+	chrome.runtime.getBackgroundPage( function(bg){
+		if(!bg.w.saved_sets) bg.w.saved_sets = {};
+		bg.w.saved_sets[document.getElementById("save_set").innerHTML] = {};
 		
-		delete storage.saved_sets[document.getElementById("saved_sets").value];
-		chrome.storage.sync.set( {"saved_sets" : storage.saved_sets} );
+		for(var setting in bg.w){
+			if(setting === "saved_sets") continue;
+			bg.w.saved_sets[document.getElementById("save_set").innerHTML][setting] = bg.w[setting];
+		}
+		
+		chrome.storage.sync.set(bg.w);
+		
+		if(!overwrite) // don't add a new option if one gets overwritten
+			document.getElementById("saved_sets").options[document.getElementById("saved_sets").options.length] =
+				new Option(document.getElementById("save_set").innerHTML, document.getElementById("save_set").innerHTML);
+
+		document.getElementById("saved_sets").value = document.getElementById("save_set").innerHTML; // select option
+	});
+}
+
+function confirm_delete_set(){
+	if(document.getElementById("saved_sets").value === "Default"){
+		showDialog("default_delete_impossible");
+		return;
+	}
+
+	showDialog("confirm_delete");
+}
+function delete_set(){
+	chrome.runtime.getBackgroundPage( function(bg){
+		delete bg.w.saved_sets[document.getElementById("saved_sets").value];
+		chrome.storage.sync.set( {"saved_sets" : bg.w.saved_sets} );
 		
 		for(var i in document.getElementById("saved_sets").options){
 			if(document.getElementById("saved_sets").options[i].value === document.getElementById("saved_sets").value)
@@ -166,18 +220,21 @@ function add_page_handling(storage)
 				break;
 			}
 		}
-	}, false);
-	
-	document.getElementById("load_set_img").addEventListener("click", function(){ // load set
+	});
+}
+
+function confirm_load_set(){ showDialog("confirm_load"); }
+function load_set(){
+	chrome.runtime.getBackgroundPage( function(bg){
 		chrome.extension.onMessage.addListener(function(msg){
 			if(msg.data === "update_optionspage")
 			{
 				chrome.extension.onMessage.removeListener(arguments.callee);
-				restoreprefs();
+				restorePrefs();
 			}
 		});
-	
-		if(storage.saved_sets) var sets = storage.saved_sets;
+
+		if(bg.w.saved_sets) var sets = bg.w.saved_sets;
 		if(document.getElementById("saved_sets").value === "Default")
 		{
 			chrome.storage.sync.clear(); // delete everything
@@ -192,50 +249,46 @@ function add_page_handling(storage)
 			chrome.storage.sync.set(temp_obj);
 		}
 		chrome.extension.sendMessage({data:"update_settings"});
-	}, false);
-	
-	document.getElementById("save_set").addEventListener("keydown", function(){ // Enter -> save configuration
-		if(window.event.which === 13){
-			window.event.preventDefault();
-			window.event.target.blur();
-			document.getElementById("save_set_img").click();
-		}
-	}, false);
-	
-	
-	var info_bubbles = document.getElementsByClassName("i"); // info bubbles:
-	
-	for(var i=0; i<info_bubbles.length; i++) // position top/bottom:
-	{
-		info_bubbles[i].addEventListener("mouseover", function(){
-			window.clearTimeout(bubble_setback);
-			if(this.offsetTop>window.scrollY+window.innerHeight/2) this.lastChild.style.marginTop = (-this.lastChild.offsetHeight+8)+"px";
-		}, false);
-		info_bubbles[i].addEventListener("mouseout", function(){
-			bubble_setback = window.setTimeout(function(){this.lastChild.style.marginTop= null;}.bind(this),500);
-		}, false);
-	}
+	});
 }
 
 function localize()
 {
-	if(chrome.i18n.getMessage("lang") === "ar" || chrome.i18n.getMessage("lang") === "ur_PK") document.body.dir = "rtl";
-	
-	var strings = document.getElementsByClassName("i18n");
+	var strings = document.querySelectorAll("[data-i18n]");
 	for(var i = 0; i < strings.length; i++)
 	{
-		if(strings[i].tagName === "IMG")	strings[i].title = chrome.i18n.getMessage(strings[i].title); // tooltips
-		else								strings[i].innerHTML += chrome.i18n.getMessage(strings[i].dataset.i18n);
+		if(strings[i].tagName === "IMG")	strings[i].title	  = getString(strings[i].dataset.i18n); // tooltips
+		else								strings[i].innerHTML += getString(strings[i].dataset.i18n);
 	}
-	
-	//help:
-	document.getElementById("help").addEventListener("click", function(){
-		window.open("http://christoph142.wordpress.com/2013/06/27/help/");
-	}, false);
-	document.getElementById("close_help").addEventListener("click", function(e){
-		e.stopPropagation();
-		document.getElementById("help").style.display = "none";
-	}, false);
+}
+function getString(string){	return chrome.i18n.getMessage(string).split("\n").join("<br>"); }
+
+function showDialog(id)
+{
+	window.location.hash = id;
+	if(document.querySelector(window.location.hash).open) return;
+
+	document.querySelector(window.location.hash).showModal();
+	document.addEventListener("keydown", handleKeyboardEvents, false);
 }
 
-var bubble_setback; // timeout for info bubbles
+function hideDialog()
+{
+	if(window.location.hash.length < 2 || !document.querySelector(window.location.hash)) return;
+
+	document.querySelector(window.location.hash).className = "close";
+	document.removeEventListener("keydown", handleKeyboardEvents, false);
+
+	window.setTimeout( function(){
+		if(document.querySelector(window.location.hash+"[open]")) document.querySelector(window.location.hash).close();
+		window.location.hash = "";
+	}, 200);
+}
+
+function handleKeyboardEvents(e)
+{
+	if(!document.querySelector("dialog[open]") || e.which !== 27 /*Esc*/) return;
+
+	if(document.querySelector("dialog[open]").querySelector(".close"))	hideDialog();
+	else {																e.preventDefault();	e.stopPropagation(); }
+}
